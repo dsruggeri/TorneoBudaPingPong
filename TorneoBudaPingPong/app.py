@@ -8,8 +8,9 @@ DATA_FILE = "torneo_data.json"
 PASSWORD_RESET = "buda"
 PLAYERS = ["Lucho", "Mauro", "Gaspar", "Yoyo", "Santi", "Ale", "Emi", "Diego"]
 
-# Mapeo de fotos (Asegurate de que los nombres de archivo coincidan)
+# Mapeo de fotos
 PLAYER_PHOTOS = {p: f"assets/{p.lower()}.png" for p in PLAYERS}
+LOGO_PATH = "assets/logo.png" # Ruta del logo principal
 
 def init_matches():
     fixture_raw = [
@@ -38,19 +39,17 @@ def save_data():
     with open(DATA_FILE, "w") as f:
         json.dump(st.session_state.partidos, f)
 
-# --- INICIALIZACIÓN DE SESIÓN ---
-st.set_page_config(page_title="Ping-Pong 8 Jugadores", page_icon="🏓", layout="wide")
+# --- INICIALIZACIÓN ---
+# Cambiamos el icono de la página y el título de la pestaña del navegador
+st.set_page_config(page_title="Torneo Budaístico PP", page_icon="🧘", layout="wide")
 
 if 'partidos' not in st.session_state:
     saved = load_data()
     st.session_state.partidos = saved if saved else init_matches()
 
-# --- SIDEBAR: RESET Y FOTOS ---
+# --- SIDEBAR ---
 with st.sidebar:
-    st.title("⚙️ Configuración")
-    
-    # Mostrar fotos hardcodeadas
-    st.subheader("👥 Jugadores")
+    st.header("👥 Jugadores")
     for p in PLAYERS:
         col_img, col_name = st.columns([1, 3])
         if os.path.exists(PLAYER_PHOTOS[p]):
@@ -60,80 +59,109 @@ with st.sidebar:
         col_name.write(p)
 
     st.divider()
-    
-    # Sección de Reset
-    st.subheader("🚨 Peligro")
-    pwd = st.text_input("Contraseña para resetear", type="password")
+    st.subheader("🚨 Resetear Torneo")
+    pwd = st.text_input("Contraseña", type="password")
     if pwd == PASSWORD_RESET:
-        if st.button("BORRAR TODO EL TORNEO"):
+        if st.button("BORRAR DATOS", type="primary"):
             st.session_state.partidos = init_matches()
             save_data()
             st.rerun()
 
 # --- LÓGICA DE TABLA ---
 def get_tabla():
-    stats = {p: {"PJ": 0, "G": 0, "P": 0, "Pts": 0} for p in PLAYERS}
+    stats = {p: {"PJ": 0, "G": 0, "P": 0, "PF": 0, "PC": 0, "Dif": 0, "Pts": 0} for p in PLAYERS}
     for m in st.session_state.partidos:
         if m["Jugado"]:
-            stats[m["P1"]]["PJ"] += 1; stats[m["P2"]]["PJ"] += 1
-            if m["S1"] > m["S2"]:
-                stats[m["P1"]]["G"] += 1; stats[m["P1"]]["Pts"] += 2; stats[m["P2"]]["P"] += 1
-            else:
-                stats[m["P2"]]["G"] += 1; stats[m["P2"]]["Pts"] += 2; stats[m["P1"]]["P"] += 1
+            p1, p2 = m["P1"], m["P2"]
+            s1, s2 = m["S1"], m["S2"]
+            
+            stats[p1]["PJ"] += 1; stats[p2]["PJ"] += 1
+            stats[p1]["PF"] += s1; stats[p1]["PC"] += s2
+            stats[p2]["PF"] += s2; stats[p2]["PC"] += s1
+            stats[p1]["Dif"] = stats[p1]["PF"] - stats[p1]["PC"]
+            stats[p2]["Dif"] = stats[p2]["PF"] - stats[p2]["PC"]
+            
+            if s1 > s2:
+                stats[p1]["G"] += 1; stats[p1]["Pts"] += 2; stats[p2]["P"] += 1
+            elif s2 > s1:
+                stats[p2]["G"] += 1; stats[p2]["Pts"] += 2; stats[p1]["P"] += 1
+                
     df = pd.DataFrame.from_dict(stats, orient='index').reset_index()
-    df.columns = ["Jugador", "PJ", "G", "P", "Pts"]
-    return df.sort_values(by=["Pts", "G"], ascending=False)
+    df.columns = ["Jugador", "PJ", "G", "P", "PF", "PC", "Dif", "Pts"]
+    return df.sort_values(by=["Pts", "Dif"], ascending=False)
 
-# --- INTERFAZ PRINCIPAL ---
-st.title("🏓 Torneo de Ping-Pong")
+# --- HEADER PERSONALIZADO ---
+# Usamos columnas para poner el logo al lado del título
+col_logo, col_title = st.columns([1, 5])
+with col_logo:
+    if os.path.exists(LOGO_PATH):
+        st.image(LOGO_PATH, width=120) # Ajusta el width si el logo es muy grande o chico
+    else:
+        st.write("🧘") # Placeholder si no encuentra la imagen
+with col_title:
+    # Usamos markdown con CSS inline para centrar verticalmente el título si hace falta
+    st.markdown("""
+        <h1 style='text-align: left; margin-top: 20px;'>
+            Torneo Budaístico de Ping-Pong
+        </h1>
+        """, unsafe_allow_html=True)
 
-tab1, tab2, tab3 = st.tabs(["📝 Resultados", "📊 Tabla", "🏆 Playoffs"])
+# --- TABS PRINCIPALES ---
+tab1, tab2, tab3 = st.tabs(["📝 Cargar Resultados", "📊 Tabla de Posiciones", "🏆 Playoffs"])
 
 with tab1:
-    ronda_n = st.selectbox("Seleccionar Fecha", [f"Fecha {i+1}" for i in range(7)])
-    partidos_fecha = [p for p in st.session_state.partidos if p["Ronda"] == ronda_n]
+    ronda_sel = st.selectbox("Elegir Fecha", [f"Fecha {i+1}" for i in range(7)])
+    partidos_f = [p for p in st.session_state.partidos if p["Ronda"] == ronda_sel]
     
-    for idx, m in enumerate(partidos_fecha):
+    for idx, m in enumerate(partidos_f):
         with st.container(border=True):
             c1, c2, c3, c4, c5, c6 = st.columns([2, 1, 0.5, 1, 2, 1])
             
-            # Jugador 1
             c1.markdown(f"**{m['P1']}**")
-            s1 = c2.number_input("Pts", value=m["S1"], key=f"s1_{ronda_n}_{idx}", label_visibility="collapsed")
             
-            c3.write("vs")
-            
-            # Jugador 2
-            s2 = c4.number_input("Pts", value=m["S2"], key=f"s2_{ronda_n}_{idx}", label_visibility="collapsed")
-            c5.markdown(f"**{m['P2']}**")
-            
-            if c6.button("Guardar", key=f"btn_{ronda_n}_{idx}"):
-                # Actualizar en el estado global
-                for p in st.session_state.partidos:
-                    if p["Ronda"] == ronda_n and p["P1"] == m["P1"] and p["P2"] == m["P2"]:
-                        p["S1"], p["S2"], p["Jugado"] = s1, s2, True
-                save_data()
-                st.success("¡Guardado!")
-                st.rerun()
+            if m["Jugado"]:
+                c2.write(f"## {m['S1']}")
+                c3.write("vs")
+                c4.write(f"## {m['S2']}")
+                c5.markdown(f"**{m['P2']}**")
+                if c6.button("Editar", key=f"edit_{ronda_sel}_{idx}"):
+                    for p_orig in st.session_state.partidos:
+                        if p_orig["Ronda"] == ronda_sel and p_orig["P1"] == m["P1"]:
+                            p_orig["Jugado"] = False
+                    st.rerun()
+            else:
+                s1 = c2.number_input("Pts", value=m["S1"], key=f"in1_{ronda_sel}_{idx}", label_visibility="collapsed")
+                c3.write("vs")
+                s2 = c4.number_input("Pts", value=m["S2"], key=f"in2_{ronda_sel}_{idx}", label_visibility="collapsed")
+                c5.markdown(f"**{m['P2']}**")
+                if c6.button("Guardar", key=f"save_{ronda_sel}_{idx}", type="primary"):
+                    for p_orig in st.session_state.partidos:
+                        if p_orig["Ronda"] == ronda_sel and p_orig["P1"] == m["P1"]:
+                            p_orig["S1"], p_orig["S2"], p_orig["Jugado"] = s1, s2, True
+                    save_data()
+                    st.rerun()
 
 with tab2:
-    st.header("Posiciones Actuales")
-    st.table(get_tabla())
+    st.header("Clasificación General")
+    df_pos = get_tabla()
+    st.dataframe(df_pos, hide_index=True, use_container_width=True)
 
 with tab3:
-    st.header("Cruces Finales")
+    st.header("Cuadro Final")
     df_t = get_tabla()
-    total_jugados = df_t["PJ"].sum()
-    
-    if total_jugados >= 28: # Todas las fechas completas
+    if df_t["PJ"].sum() >= 28:
         top = df_t.head(4)["Jugador"].tolist()
-        col1, col2 = st.columns(2)
-        with col1:
-            st.subheader("Semis")
-            st.info(f"1º {top[0]} vs 4º {top[3]}")
-            st.info(f"2º {top[1]} vs 3º {top[2]}")
-        with col2:
-            st.subheader("Final")
-            st.warning("Ganadores de Semis")
+        st.success("¡Fase regular completada!")
+        col_s1, col_s2 = st.columns(2)
+        with col_s1:
+             st.subheader("Semifinal 1")
+             st.info(f"1º {top[0]} vs 4º {top[3]}")
+        with col_s2:
+             st.subheader("Semifinal 2")
+             st.info(f"2º {top[1]} vs 3º {top[2]}")
     else:
-        st.info(f"Se han jugado {total_jugados//2} de 28 partidos. Los playoffs se liberan al terminar la fase regular.")
+        partidos_restantes = 28 - (df_t["PJ"].sum() // 2)
+        st.warning(f"Faltan jugar {partidos_restantes} partidos para definir los Playoffs.")
+
+```
+
