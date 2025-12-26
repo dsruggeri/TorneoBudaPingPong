@@ -163,5 +163,5 @@ with tab3:
         partidos_restantes = 28 - (df_t["PJ"].sum() // 2)
         st.warning(f"Faltan jugar {partidos_restantes} partidos para definir los Playoffs.")
 
-```
+
 
