@@ -104,6 +104,8 @@ def get_tabla():
                 
     df = pd.DataFrame.from_dict(stats, orient='index').reset_index()
     df.columns = ["Jugador", "PJ", "G", "P", "PF", "PC", "Dif", "Pts"]
+    cols_enteros = ["PJ", "G", "P", "PF", "PC", "Dif", "Pts"]
+    df[cols_enteros] = df[cols_enteros].astype(int)
     return df.sort_values(by=["Pts", "Dif"], ascending=False)
 
 # --- HEADER PERSONALIZADO ---
@@ -136,9 +138,9 @@ with tab1:
             c1.markdown(f"**{m['P1']}**")
             
             if m["Jugado"]:
-                c2.write(f"## {m['S1']}")
+                c2.write(f"## {int(m['S1'])}")  # Agregamos int()
                 c3.write("vs")
-                c4.write(f"## {m['S2']}")
+                c4.write(f"## {int(m['S2'])}")  # Agregamos int()
                 c5.markdown(f"**{m['P2']}**")
                 if c6.button("Editar", key=f"edit_{ronda_sel}_{idx}"):
                     for p_orig in st.session_state.partidos:
@@ -146,9 +148,10 @@ with tab1:
                             p_orig["Jugado"] = False
                     st.rerun()
             else:
-                s1 = c2.number_input("Pts", value=m["S1"], key=f"in1_{ronda_sel}_{idx}", label_visibility="collapsed")
+                # Forzamos value=int(...) y step=1 para que Streamlit sepa que es un entero
+                s1 = c2.number_input("Pts", value=int(m["S1"]), step=1, key=f"in1_{ronda_sel}_{idx}", label_visibility="collapsed")
                 c3.write("vs")
-                s2 = c4.number_input("Pts", value=m["S2"], key=f"in2_{ronda_sel}_{idx}", label_visibility="collapsed")
+                s2 = c4.number_input("Pts", value=int(m["S2"]), step=1, key=f"in2_{ronda_sel}_{idx}", label_visibility="collapsed")
                 c5.markdown(f"**{m['P2']}**")
                 if c6.button("Guardar", key=f"save_{ronda_sel}_{idx}", type="primary"):
                     for p_orig in st.session_state.partidos:
@@ -178,6 +181,7 @@ with tab3:
     else:
         partidos_restantes = 28 - (df_t["PJ"].sum() // 2)
         st.warning(f"Faltan jugar {partidos_restantes} partidos para definir los Playoffs.")
+
 
 
 
