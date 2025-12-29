@@ -2,11 +2,15 @@ import streamlit as st
 import pandas as pd
 import json
 import os
+from streamlit_gsheets import GSheetsConnection 
 
 # --- CONFIGURACIÓN ---
-DATA_FILE = "torneo_data.json"
+
 PASSWORD_RESET = "buda"
 PLAYERS = ["Lucho", "Mauro", "Gaspar", "Yoyo", "Santi", "Ale", "Emi", "Diego"]
+# --- CONEXIÓN A GOOGLE SHEETS ---
+conn = st.connection("gsheets", type=GSheetsConnection)
+
 
 # Mapeo de fotos
 # --- CONFIGURACIÓN DE RUTAS ---
@@ -35,14 +39,21 @@ def init_matches():
     return partidos
 
 def load_data():
-    if os.path.exists(DATA_FILE):
-        with open(DATA_FILE, "r") as f:
-            return json.load(f)
-    return None
+    try:
+        # Leemos la hoja "Partidos" de tu Google Sheet
+        df = conn.read(worksheet="Partidos", ttl=0)
+        if df.empty:
+            return None
+        # Convertimos el DataFrame a lista de diccionarios para que tu código siga funcionando igual
+        return df.to_dict(orient="records")
+    except Exception:
+        return None
 
 def save_data():
-    with open(DATA_FILE, "w") as f:
-        json.dump(st.session_state.partidos, f)
+    # Convertimos los datos actuales a DataFrame y los subimos
+    df_to_save = pd.DataFrame(st.session_state.partidos)
+    conn.update(worksheet="Partidos", data=df_to_save)
+    st.toast("✅ Datos sincronizados en la nube")
 
 # --- INICIALIZACIÓN ---
 # Cambiamos el icono de la página y el título de la pestaña del navegador
@@ -167,6 +178,7 @@ with tab3:
     else:
         partidos_restantes = 28 - (df_t["PJ"].sum() // 2)
         st.warning(f"Faltan jugar {partidos_restantes} partidos para definir los Playoffs.")
+
 
 
 
