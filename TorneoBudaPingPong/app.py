@@ -9,8 +9,13 @@ PASSWORD_RESET = "buda"
 PLAYERS = ["Lucho", "Mauro", "Gaspar", "Yoyo", "Santi", "Ale", "Emi", "Diego"]
 
 # Mapeo de fotos
-PLAYER_PHOTOS = {p: f"assets/{p.lower()}.png" for p in PLAYERS}
-LOGO_PATH = "assets/logo.png" # Ruta del logo principal
+# --- CONFIGURACIÓN DE RUTAS ---
+# Obtenemos la ruta absoluta de la carpeta donde está este archivo app.py
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Construimos las rutas uniendo BASE_DIR + la carpeta assets
+PLAYER_PHOTOS = {p: os.path.join(BASE_DIR, "assets", f"{p.lower()}.png") for p in PLAYERS}
+LOGO_PATH = os.path.join(BASE_DIR, "assets", "logo.png")
 
 def init_matches():
     fixture_raw = [
@@ -162,6 +167,7 @@ with tab3:
     else:
         partidos_restantes = 28 - (df_t["PJ"].sum() // 2)
         st.warning(f"Faltan jugar {partidos_restantes} partidos para definir los Playoffs.")
+
 
 
 
